@@ -1,0 +1,29 @@
+{
+  "email": {
+    "enabled": false,
+    "smtp_server": "smtp.gmail.com",
+    "smtp_port": 587,
+    "username": "security@example.com",
+    "password": "your_app_password",
+    "recipients": [
+      "admin@example.com",
+      "security-team@example.com"
+    ]
+  },
+  "firewall": {
+    "enabled": true,
+    "use_iptables": true,
+    "use_fail2ban": false
+  },
+  "thresholds": {
+    "block_threshold": 0.8,
+    "rate_limit_threshold": 0.6,
+    "alert_threshold": 0.5,
+    "max_attempts": 10,
+    "time_window": 300
+  },
+  "logging": {
+    "log_file": "threat_responses.log",
+    "log_level": "INFO"
+  }
+}

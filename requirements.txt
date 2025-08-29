@@ -1,0 +1,48 @@
+# SSH Bruteforce Detection System Requirements
+
+# Core dependencies
+pandas>=1.5.0
+numpy>=1.21.0
+scikit-learn>=1.1.0
+matplotlib>=3.5.0
+seaborn>=0.11.0
+
+# Deep Learning (optional)
+tensorflow>=2.8.0
+torch>=1.12.0
+torchvision>=0.13.0
+
+# Data processing
+joblib>=1.1.0
+ipaddress
+
+# Kaggle API for dataset download
+kaggle>=1.5.12
+
+# Monitoring and logging
+sqlite3
+
+# System utilities
+pathlib
+datetime
+threading
+queue
+json
+subprocess
+time
+logging
+warnings
+argparse
+
+# Email alerts (optional)
+smtplib
+email
+
+# Development and testing
+pytest>=7.0.0
+jupyter>=1.0.0
+notebook>=6.4.0
+
+# Optional: For better performance
+numba>=0.56.0
+cython>=0.29.0

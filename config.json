@@ -1,0 +1,105 @@
+{
+  "data_source": "sample",
+  "model_types": ["random_forest", "neural_network"],
+  "evaluation_enabled": true,
+  "real_time_monitoring": false,
+  "automated_response": false,
+  
+  "data_settings": {
+    "beth_dataset": {
+      "enabled": false,
+      "kaggle_dataset": "katehighnam/beth-dataset"
+    },
+    "sample_data": {
+      "n_samples": 10000,
+      "attack_ratio": 0.2
+    }
+  },
+  
+  "model_settings": {
+    "random_forest": {
+      "n_estimators": 100,
+      "random_state": 42,
+      "max_depth": null
+    },
+    "neural_network": {
+      "epochs": 50,
+      "batch_size": 32,
+      "learning_rate": 0.001,
+      "hidden_layers": [128, 64, 32, 16]
+    }
+  },
+  
+  "evaluation_settings": {
+    "test_size": 0.2,
+    "cross_validation": {
+      "enabled": true,
+      "folds": 5
+    },
+    "metrics": [
+      "accuracy",
+      "precision", 
+      "recall",
+      "f1_score",
+      "roc_auc",
+      "detection_rate",
+      "false_alarm_rate"
+    ]
+  },
+  
+  "monitoring_settings": {
+    "real_time": {
+      "enabled": false,
+      "log_file": "/var/log/auth.log",
+      "check_interval": 1.0
+    },
+    "threat_thresholds": {
+      "low": 0.3,
+      "medium": 0.6,
+      "high": 0.8,
+      "critical": 0.9
+    }
+  },
+  
+  "response_settings": {
+    "automated_blocking": {
+      "enabled": false,
+      "threshold": 0.8,
+      "use_iptables": true
+    },
+    "rate_limiting": {
+      "enabled": true,
+      "threshold": 0.6,
+      "duration": 300
+    },
+    "alerting": {
+      "email": {
+        "enabled": false,
+        "smtp_server": "smtp.gmail.com",
+        "smtp_port": 587,
+        "username": "",
+        "password": "",
+        "recipients": []
+      },
+      "log_alerts": {
+        "enabled": true,
+        "log_file": "threat_alerts.log"
+      }
+    }
+  },
+  
+  "logging": {
+    "level": "INFO",
+    "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    "file": "ssh_detection.log",
+    "max_size": "10MB",
+    "backup_count": 5
+  },
+  
+  "paths": {
+    "data_dir": "data",
+    "models_dir": "models",
+    "reports_dir": "reports",
+    "logs_dir": "logs"
+  }
+}
