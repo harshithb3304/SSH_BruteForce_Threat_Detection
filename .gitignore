@@ -236,7 +236,7 @@ data/*.csv
 data/*.json
 data/*.zip
 data/*.tar.gz
-beth_dataset
+/datasets/
 *.parquet
 
 # Trained models - binary files, should be stored elsewhere
