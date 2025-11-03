@@ -20,6 +20,8 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import classification_report, confusion_matrix, accuracy_score, roc_auc_score
 from sklearn.linear_model import LogisticRegression
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.ensemble import IsolationForest
 
 # Setup logging
 logging.basicConfig(
@@ -36,8 +38,9 @@ def load_separate_beth_files():
     """Load separate BETH training and testing files"""
     logger.info("=== Loading Separate BETH Files ===")
     
-    train_file = "src/data/data/beth/labelled_training_data.csv"
-    test_file = "src/data/data/beth/labelled_testing_data.csv"
+    # Align with project structure used by scripts and docs
+    train_file = "datasets/labelled_training_data.csv"
+    test_file = "datasets/labelled_testing_data.csv"
     
     logger.info(f"Loading training data: {train_file}")
     train_df = pd.read_csv(train_file, low_memory=False)
@@ -98,14 +101,14 @@ def extract_beth_features(df):
     return features
 
 def train_single_model():
-    """Train a single Random Forest model to avoid complexity"""
+    """Train supervised models + unsupervised anomaly model and evaluate with majority voting"""
     logger.info("="*80)
     logger.info("PROPER SSH BRUTEFORCE DETECTION TRAINING")
     logger.info("Using Separate BETH Train/Test Files")
     logger.info("="*80)
     
-    # Create directories
-    models_dir = Path('models_proper')
+    # Create directories (align with simulation which expects models/)
+    models_dir = Path('models')
     models_dir.mkdir(exist_ok=True)
     
     # Load separate files
@@ -129,13 +132,13 @@ def train_single_model():
     X_test_scaled = scaler.transform(X_test)
     logger.info("✓ Features scaled")
     
-    # Train Random Forest (simpler to avoid overfitting)
+    # Train Random Forest
     logger.info("\n=== Training Random Forest ===")
     rf_model = RandomForestClassifier(
-        n_estimators=50,     # Reduced from 100
-        max_depth=10,        # Reduced from 20  
-        min_samples_split=20, # Increased from 10
-        min_samples_leaf=10,  # Increased from 4
+        n_estimators=50,    
+        max_depth=10,         
+        min_samples_split=20, 
+        min_samples_leaf=10, 
         random_state=42,
         n_jobs=-1
     )
@@ -143,21 +146,74 @@ def train_single_model():
     logger.info("Training model...")
     rf_model.fit(X_train_scaled, y_train)
     
+    # Train Decision Tree (todo: decision tree)
+    logger.info("\n=== Training Decision Tree ===")
+    dt_model = DecisionTreeClassifier(
+        max_depth=10,
+        min_samples_split=20,
+        min_samples_leaf=10,
+        random_state=42
+    )
+    dt_model.fit(X_train_scaled, y_train)
+    
+    # Unsupervised anomaly detection (Isolation Forest)
+    logger.info("\n=== Training Isolation Forest (unsupervised) ===")
+    # Fit only on training features of the majority class to learn normality
+    try:
+        normal_mask = (y_train == 0)
+        if normal_mask.sum() > 0:
+            iso_train = X_train_scaled[normal_mask]
+        else:
+            iso_train = X_train_scaled
+    except Exception:
+        iso_train = X_train_scaled
+    iso_model = IsolationForest(
+        n_estimators=100,
+        contamination=0.02,  # small fraction anomalies expected
+        random_state=42,
+        n_jobs=-1
+    )
+    iso_model.fit(iso_train)
+
     # Evaluate on truly independent test set
     logger.info("\n=== Evaluation on Independent Test Set ===")
-    y_pred = rf_model.predict(X_test_scaled)
-    y_pred_proba = rf_model.predict_proba(X_test_scaled)[:, 1]
+    rf_pred = rf_model.predict(X_test_scaled)
+    rf_proba = rf_model.predict_proba(X_test_scaled)[:, 1]
+    dt_pred = dt_model.predict(X_test_scaled)
+    # IsolationForest: predict returns -1 for anomaly, 1 for normal
+    iso_pred_raw = iso_model.predict(X_test_scaled)
+    iso_pred = np.where(iso_pred_raw == -1, 1, 0)
+    
+    # Train logistic regression for comparison and ensemble
+    logger.info("\n=== Training Logistic Regression (for comparison) ===")
+    lr_model = LogisticRegression(random_state=42, max_iter=1000)
+    lr_model.fit(X_train_scaled, y_train)
+    lr_pred = lr_model.predict(X_test_scaled)
+    lr_proba = lr_model.predict_proba(X_test_scaled)[:, 1]
+    
+    # Majority voting: RF, LR, DT, ISO (unsupervised)
+    votes = np.vstack([rf_pred, lr_pred, dt_pred, iso_pred])
+    ensemble_pred = (votes.sum(axis=0) >= 2).astype(int)
+    
+    # For ROC-AUC, use average probability of supervised models
+    ensemble_proba = (rf_proba + lr_proba) / 2.0
     
     # Calculate metrics
-    accuracy = accuracy_score(y_test, y_pred)
-    cm = confusion_matrix(y_test, y_pred)
+    accuracy = accuracy_score(y_test, rf_pred)
+    lr_accuracy = accuracy_score(y_test, lr_pred)
+    dt_accuracy = accuracy_score(y_test, dt_pred)
+    ensemble_accuracy = accuracy_score(y_test, ensemble_pred)
+    cm = confusion_matrix(y_test, ensemble_pred)
     
     logger.info(f"\n📊 REAL Performance Metrics:")
-    logger.info(f"  Accuracy: {accuracy:.4f}")
+    logger.info(f"  RF Accuracy: {accuracy:.4f}")
+    logger.info(f"  LR Accuracy: {lr_accuracy:.4f}")
+    logger.info(f"  DT Accuracy: {dt_accuracy:.4f}")
+    logger.info(f"  Ensemble (RF+LR+DT+ISO) Accuracy: {ensemble_accuracy:.4f}")
     
     if len(np.unique(y_test)) > 1:
-        roc_auc = roc_auc_score(y_test, y_pred_proba)
-        logger.info(f"  ROC-AUC:  {roc_auc:.4f}")
+        roc_auc = roc_auc_score(y_test, ensemble_proba)
+        logger.info(f"  Ensemble ROC-AUC:  {roc_auc:.4f}")
     
     logger.info(f"\n📈 Confusion Matrix:")
     tn, fp, fn, tp = cm.ravel() if cm.size == 4 else (cm[0,0], 0, 0, cm[1,1])
@@ -174,8 +230,8 @@ def train_single_model():
         recall = tp / (tp + fn)
         logger.info(f"  Recall: {recall:.4f}")
     
-    logger.info(f"\n📋 Detailed Classification Report:")
-    logger.info(f"\n{classification_report(y_test, y_pred, target_names=['Normal', 'Attack'])}")
+    logger.info(f"\n📋 Detailed Classification Report (Ensemble):")
+    logger.info(f"\n{classification_report(y_test, ensemble_pred, target_names=['Normal', 'Attack'])}")
     
     # Feature importance
     feature_importance = pd.DataFrame({
@@ -202,16 +258,10 @@ def train_single_model():
     
     logger.info(f"\n✓ Model saved: {model_path}")
     
-    # Also train a simple Logistic Regression for comparison
-    logger.info("\n=== Training Logistic Regression (for comparison) ===")
-    lr_model = LogisticRegression(random_state=42, max_iter=1000)
-    lr_model.fit(X_train_scaled, y_train)
-    
-    lr_pred = lr_model.predict(X_test_scaled)
-    lr_accuracy = accuracy_score(y_test, lr_pred)
-    
     logger.info(f"Logistic Regression Accuracy: {lr_accuracy:.4f}")
     logger.info(f"Random Forest Accuracy: {accuracy:.4f}")
+    logger.info(f"Decision Tree Accuracy: {dt_accuracy:.4f}")
+    logger.info(f"Ensemble Accuracy: {ensemble_accuracy:.4f}")
     
     # Save LR model too
     lr_path = models_dir / 'logistic_regression_proper.pkl'
@@ -229,6 +279,9 @@ def train_single_model():
     
     logger.info(f"✓ Logistic Regression saved: {lr_path}")
     
+    # Optionally save Decision Tree and Isolation Forest for further analysis
+    # Not required by simulation, so keeping artifacts in memory only
+    
     logger.info("\n" + "="*80)
     logger.info("PROPER TRAINING COMPLETED")
     logger.info("="*80)
@@ -237,6 +290,8 @@ def train_single_model():
     logger.info(f"Testing samples: {len(X_test):,}")
     logger.info(f"Final RF Accuracy: {accuracy:.4f}")
     logger.info(f"Final LR Accuracy: {lr_accuracy:.4f}")
+    logger.info(f"Final DT Accuracy: {dt_accuracy:.4f}")
+    logger.info(f"Final Ensemble Accuracy: {ensemble_accuracy:.4f}")
 
 if __name__ == "__main__":
     train_single_model()

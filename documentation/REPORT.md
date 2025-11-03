@@ -104,15 +104,24 @@ LogisticRegression(
 - Probabilistic output for confidence scoring
 - Memory efficient for production deployment
 
-#### Ensemble Strategy: Hybrid Learning
-The system combines both models using **ensemble voting**:
+#### Model 3: Decision Tree Classifier
+Conservative depth/leaf settings aligned with RF.
 
-1. **Individual Predictions**: Each model generates prediction + confidence score
-2. **Confidence Averaging**: Final confidence = (RF_confidence + LR_confidence) / 2  
-3. **Threshold Decision**: Attack if ensemble_confidence > 0.5
-4. **Best of Both**: Combines RF's robustness with LR's speed and accuracy
+#### Unsupervised: Isolation Forest
+Learns normal behavior on training features; flags anomalies on test/stream data.
 
-**Ensemble Performance**: 94.54% accuracy, 99.95% precision, 82k samples/sec
+#### Ensemble Strategy: Hybrid Learning (Supervised + Unsupervised)
+Voting members: RF, LR, DT, IsolationForest (ISO indicates anomaly=attack).
+
+Decision rule: Majority vote (>=2 votes → Attack).  
+Confidence displayed: average of supervised probabilities (RF+LR).
+
+**Observed Performance (Independent Test Set):**
+- RF Accuracy: 90.67%
+- LR Accuracy: 94.54%
+- DT Accuracy: 95.11%
+- Ensemble (RF+LR+DT+ISO) Accuracy: 94.53%
+- Ensemble ROC-AUC: 97.87%
 
 ### Feature Engineering Pipeline
 
@@ -152,20 +161,21 @@ def create_labels(df):
 |-------|----------|-----------|--------|----------|---------|
 | **Random Forest** | **90.67%** | **99.77%** | **89.92%** | **94.59%** | **96.26%** |
 | **Logistic Regression** | **94.54%** | **99.95%** | **94.04%** | **96.90%** | **98.12%** |
+| **Decision Tree** | **95.11%** | **99.73%** | **94.21%** | **96.89%** | **—** |
+| **Ensemble (RF+LR+DT+ISO)** | **94.53%** | **99.73%** | **94.23%** | **96.91%** | **97.87%** |
 
-#### Confusion Matrix Analysis
+#### Confusion Matrix (Ensemble)
 ```
-Random Forest Results:
                 Predicted
                 Normal    Attack
-Actual Normal  [[17,105   403]]
-       Attack  [[17,276  154,183]]
+Actual Normal  [[17,077   431]]
+       Attack  [[ 9,897  161,562]]
 
 Key Metrics:
-├── True Positives:  154,183 (Attacks correctly identified)
-├── True Negatives:  17,105  (Normal traffic correctly classified)  
-├── False Positives: 403     (Normal traffic misclassified as attack)
-└── False Negatives: 17,276  (Attacks missed by system)
+├── Precision: 0.9973
+├── Detection Rate (Recall): 0.9423
+├── False Alarm Rate: 0.0246
+└── ROC-AUC: 0.9787
 ```
 
 #### Security-Specific Performance
@@ -393,11 +403,13 @@ Data Loading:
 └── Class Balance: Maintained natural distribution
 
 Model Training:
-├── Random Forest: 5.7 seconds training time
-├── Logistic Regression: 0.16 seconds training time
+├── Random Forest: ~7 seconds training time
+├── Decision Tree: ~1 second training time
+├── Isolation Forest: ~3 seconds training time
+├── Logistic Regression: ~1 second training time
 ├── Memory Usage: <500MB peak during training
 ├── CPU Usage: 100% during training (expected)
-└── Model Persistence: Saved to models_proper/ directory
+└── Model Persistence: Saved to models/ directory
 ```
 
 ### 8.2 Comprehensive Testing Log Summary
@@ -428,21 +440,28 @@ Results Summary:
 ### 9.1 Project Structure
 ```
 SSH_BruteForce_Threat_Detection/
-├── 📁 src/data/               # Dataset management
-│   ├── download_data.py       # Kaggle API integration
-│   └── beth/                  # BETH dataset files
-├── 📁 models_proper/          # Trained models
+├── datasets/                         # BETH split CSVs
+│   ├── labelled_training_data.csv
+│   └── labelled_testing_data.csv
+├── models/                           # Trained models
 │   ├── random_forest_proper.pkl
-│   ├── logistic_regression_proper.pkl
-│   └── scaler_proper.pkl
-├── 📄 proper_training.py      # Main training script
-├── 📄 comprehensive_testing.py # Testing framework
-├── 📄 config.json            # System configuration
-├── 📄 requirements.txt       # Dependencies
-└── 📋 logs/                  # Training and evaluation logs
-    ├── proper_training_log.txt
-    ├── comprehensive_test_log.txt
-    └── evaluation_log.txt
+│   └── logistic_regression_proper.pkl
+├── scripts/                          # Training, testing, monitoring
+│   ├── proper_training.py
+│   ├── simulate_realtime.py
+│   ├── realtime_monitor.py
+│   ├── comprehensive_testing.py
+│   ├── test_detector.py
+│   ├── threat_response.py
+│   ├── log_parser.py
+│   └── download_data.py
+├── documentation/
+│   ├── REPORT.md
+│   ├── PROJECT_DELIVERABLES.md
+│   └── README.md
+├── logs/
+├── requirements.txt
+└── run_simulation.sh
 ```
 
 ### 9.2 System Dependencies

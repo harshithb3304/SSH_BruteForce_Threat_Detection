@@ -1,7 +1,48 @@
 # SSH Bruteforce Attack Detection System
 
+## Quick Start (Evaluator-Friendly)
+
+### 1) Setup
+```bash
+cd /home/harshith/Projects/CNS_Lab/SSH_BruteForce_Threat_Detection
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+### 2) Data
+Place the BETH split CSVs here:
+```
+datasets/labelled_training_data.csv
+datasets/labelled_testing_data.csv
+```
+If needed, use `scripts/download_data.py` to fetch/prepare.
+
+### 3) Train (uses independent test set; prevents overfitting)
+```bash
+.venv/bin/python scripts/proper_training.py
+```
+This saves models to `models/`.
+
+### 4) Demo: Real-time Simulation
+```bash
+bash run_simulation.sh -q   # 15s quick demo
+# or
+bash run_simulation.sh -l   # 60s extended demo
+```
+
+## What Each Script Does (in `scripts/`)
+- `proper_training.py`: Trains models on BETH split (train vs test). Trains RandomForest, LogisticRegression, DecisionTree, and IsolationForest (unsupervised). Reports metrics and saves RF/LR models for simulation.
+- `simulate_realtime.py`: Console demo that loads models and streams sampled test rows to show live detections with confidence.
+- `realtime_monitor.py`: Real-time watcher for SSH logs (e.g., `/var/log/auth.log`) to flag bruteforce behavior.
+- `comprehensive_testing.py`: Full evaluation framework (batch speed, cross-validation, robustness checks).
+- `test_detector.py`: Unit-style tests to sanity-check detector functions.
+- `threat_response.py`: Example automated responses (block IP, rate limiting) hooks.
+- `log_parser.py`: Utilities for parsing logs and extracting features.
+- `download_data.py`: Dataset download/prepare helpers (e.g., via Kaggle API).
+
 ## Project Overview
-This project implements an AI-based real-time threat detection system specifically designed to identify **SSH-Bruteforce attacks** using machine learning techniques. The system analyzes SSH authentication logs to detect malicious bruteforce attempts while maintaining low false positive rates through advanced feature engineering and overfitting prevention techniques.
+This project implements an AI-based real-time threat detection system to identify **SSH-Bruteforce attacks** using machine learning with proper train/test separation and a hybrid supervised + unsupervised ensemble.
 
 ## Attack Type: SSH-Bruteforce
 SSH Bruteforce attacks involve automated attempts to gain unauthorized access to systems by systematically trying various username/password combinations against SSH services. These attacks are characterized by:
@@ -20,16 +61,12 @@ SSH Bruteforce attacks involve automated attempts to gain unauthorized access to
 - **Size**: ~2.5GB compressed, contains SSH bruteforce attack samples
 - **Format**: CSV files with timestamp, source IP, event type, and authentication details
 
-### Dataset Download Process
+### Dataset Download Process (optional)
 ```bash
-# Install Kaggle API
 pip install kaggle
-
-# Setup Kaggle credentials (requires kaggle.json)
+# place kaggle.json and download
 kaggle datasets download -d katehighnam/beth-dataset
-
-# Automated download via project
-python src/data/download_data.py --dataset beth
+.venv/bin/python scripts/download_data.py
 ```
 
 ### Alternative Data Sources
@@ -151,9 +188,9 @@ for idx, row in df_sorted.iterrows():
 ## Machine Learning Models
 
 ### Model Architecture
-The system employs an ensemble approach with three complementary algorithms:
+The system employs an ensemble with complementary algorithms:
 
-#### 1. Logistic Regression (Primary Model)
+#### 1. Logistic Regression (Supervised)
 **Configuration**:
 ```python
 LogisticRegression(
@@ -166,7 +203,7 @@ LogisticRegression(
 **Advantages**: Interpretable, fast inference, probabilistic output
 **Use Case**: Real-time classification with explainable decisions
 
-#### 2. Random Forest (Conservative)
+#### 2. Random Forest (Supervised)
 **Configuration**:
 ```python
 RandomForestClassifier(
@@ -180,18 +217,16 @@ RandomForestClassifier(
 **Advantages**: Handles non-linear patterns, feature importance ranking
 **Use Case**: Complex pattern detection, feature analysis
 
-#### 3. Support Vector Machine
-**Configuration**:
-```python
-SVC(
-    C=0.1,              # Strong regularization
-    kernel='rbf',       # Radial basis function
-    probability=True,   # Enable probability estimates
-    random_state=42
-)
-```
-**Advantages**: Effective in high-dimensional space, memory efficient
-**Use Case**: Non-linear boundary detection
+#### 3. Decision Tree (Supervised)
+Conservative depth/leaf settings aligned with overfitting prevention used in RF.
+
+#### 4. Isolation Forest (Unsupervised)
+Learns normality on training set to flag anomalies on test/streaming data.
+
+### Ensemble Strategy
+- Voting members: RF, LR, DT, IsolationForest (ISO flags anomaly as attack)
+- Decision: majority vote (>=2) for Attack
+- Confidence (for display): average of supervised probabilities (RF+LR)
 
 ### Model Selection Process
 1. **Cross-validation**: 3-fold stratified CV on training data
@@ -212,10 +247,15 @@ SVC(
 - **Categorical encoding**: Binary encoding for categorical features
 
 ### Training Configuration
-- **Train/Test split**: 70/30 temporal split (chronological)
-- **Validation method**: Stratified K-Fold (k=3)
-- **Class balancing**: Natural distribution maintained
-- **Random state**: 42 for reproducibility
+- **Datasets**: Independent BETH splits
+  - Training: `datasets/labelled_training_data.csv` (763,144 rows)
+  - Testing: `datasets/labelled_testing_data.csv` (188,967 rows)
+- **Attack label**: `is_attack = (sus==1 or evil==1)`
+- **Class balance**:
+  - Train: 0.17% attacks (1,269 / 763,144)
+  - Test: 90.73% attacks (171,459 / 188,967)
+- **Class balancing policy**: Natural distribution maintained
+- **Scaler**: StandardScaler for numeric features
 
 ### Overfitting Prevention Measures
 1. **Temporal data splitting**: Train on early data, test on later data
@@ -240,14 +280,17 @@ ssh_bruteforce_detection/
 └── docs/                  # Documentation
 ```
 
-## Performance Evaluation and Metrics
+## Performance Evaluation and Metrics (Independent Test Set)
 
-### Model Performance (After Overfitting Fix)
-- **Training Accuracy**: 80-94% (realistic range, varies by dataset)
-- **External Test Accuracy**: 84-94% (excellent generalization)
-- **Performance Drop**: <6% (well within acceptable limits)
-- **Cross-Domain Robustness**: 85-90% across different network environments
-- **F1-Score**: 0.85-0.93 (balanced precision-recall)
+Trained and tested via `scripts/proper_training.py` on BETH splits (prevents data leakage):
+
+- RF Accuracy: 0.9067
+- LR Accuracy: 0.9454
+- DT Accuracy: 0.9511
+- Ensemble (RF+LR+DT+ISO) Accuracy: 0.9453
+- Ensemble ROC-AUC: 0.9787
+- Confusion Matrix (Ensemble): TN=17,077, FP=431, FN=9,897, TP=161,562
+- Precision: 0.9973 | Recall (Detection Rate): 0.9423 | False Alarm Rate: 0.0246
 
 ### Evaluation Metrics Implementation
 
@@ -388,17 +431,11 @@ python improved_detector.py
 python realtime_monitor.py --config config.json
 ```
 
-### Quick Start Demo
+### Quick Demo (Simulation)
 ```bash
-# Run comprehensive demonstration
-python quick_demo.py
-
-# Validate overfitting prevention
-python validate_overfitting.py
-
-# Test external validation
-python external_validation.py
+bash run_simulation.sh -q   # 15 seconds
 ```
+Shows colorized alerts with timestamps, model confidences, and running throughput.
 
 ### Configuration
 Edit `config.json` to customize:
@@ -422,7 +459,7 @@ Edit `config.json` to customize:
 - **High-Volume Attacks**: May require additional infrastructure scaling
 - **False Positives**: Legitimate users may trigger alerts under certain conditions
 
-## Critical Issue Resolution: Overfitting
+## Overfitting: Identification and Resolution
 
 ### ⚠️ Important: Overfitting Issue Identified and Resolved
 **Initial models showed 100% accuracy due to severe overfitting.** This has been comprehensively analyzed and fixed through:
@@ -433,9 +470,9 @@ Edit `config.json` to customize:
 4. **External validation** - Testing on completely unseen datasets
 5. **Cross-domain testing** - Validation across different network environments
 
-**See `OVERFITTING_ANALYSIS.md` for detailed technical analysis.**
+Measures in code: separate train/test files, simplified features, conservative params.
 
-## Research Compliance
+## Deliverables Compliance
 
 This project addresses the deliverables specified in the CNS Lab project requirements:
 
@@ -443,7 +480,7 @@ This project addresses the deliverables specified in the CNS Lab project require
 ✅ **Dataset description** and justification of BETH dataset selection  
 ✅ **AI model design** with detailed architecture and training methodology  
 ✅ **Comprehensive evaluation** with confusion matrix, accuracy, precision, recall, F1-scores  
-✅ **Real-time detection demo** with live monitoring capabilities  
+✅ **Real-time detection demo** with live monitoring capabilities (simulation)  
 ✅ **Detailed methodology** describing feature engineering and overfitting prevention  
 
 ## References and Further Reading

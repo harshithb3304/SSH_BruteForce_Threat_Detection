@@ -376,7 +376,7 @@ class ThreatResponse:
             SELECT response_action, COUNT(*) as count
             FROM threat_events 
             WHERE timestamp > ?
-            GROUP BY response_action
+            GROUP BY response_actionreturn
         ''', (since,))
         response_stats = cursor.fetchall()
         

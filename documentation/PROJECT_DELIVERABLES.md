@@ -173,33 +173,33 @@ LogisticRegression(
 
 ### 5.1 Supervised Learning (Labeled Data)
 
-**Evaluation Metrics:**
+**Evaluation Metrics (Independent Test Set):**
 
-| Metric | Random Forest | Logistic Regression |
-|--------|---------------|-------------------|
-| **Accuracy** | **90.67%** | **94.54%** |
-| **Precision** | **99.77%** | **99.95%** |
-| **Recall** | **89.92%** | **94.04%** |
-| **F1 Score** | **94.59%** | **96.90%** |
-| **AUC-ROC** | **96.26%** | **98.12%** |
+| Metric | Random Forest | Logistic Regression | Decision Tree | Ensemble (RF+LR+DT+ISO) |
+|--------|---------------|---------------------|---------------|-------------------------|
+| **Accuracy** | **90.67%** | **94.54%** | **95.11%** | **94.53%** |
+| **Precision** | **99.77%** | **99.95%** | **99.73%** | **99.73%** |
+| **Recall** | **89.92%** | **94.04%** | **94.21%** | **94.23%** |
+| **F1 Score** | **94.59%** | **96.90%** | **96.89%** | **96.91%** |
+| **AUC-ROC** | **96.26%** | **98.12%** | **—** | **97.87%** |
 
 **Cross-Validation Results:**
 - **Mean Accuracy:** 99.98% ± 0.0000
 - **95% Confidence Interval:** [99.98%, 99.98%]
 - **Stability:** Extremely consistent across folds
 
-**Confusion Matrix (Random Forest):**
+**Confusion Matrix (Ensemble):**
 ```
                 Predicted
                 Normal    Attack
-Actual Normal  [[17,105   403]]
-       Attack  [[17,276  154,183]]
+Actual Normal  [[17,077   431]]
+       Attack  [[ 9,897  161,562]]
 
 Security Metrics:
-├── Detection Rate: 89.92% (154,183/171,459)
-├── False Alarm Rate: 2.30% (403/17,508)
-├── True Positive Rate: 89.92%
-└── False Positive Rate: 2.30%
+├── Detection Rate: 94.23% (161,562/171,459)
+├── False Alarm Rate: 2.46% (431/17,508)
+├── True Positive Rate: 94.23%
+└── False Positive Rate: 2.46%
 ```
 
 ### 5.2 Unsupervised Learning Component

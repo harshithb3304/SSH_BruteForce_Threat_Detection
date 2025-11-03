@@ -1,0 +1,108 @@
+2025-11-03 20:44:29,007 - INFO - ================================================================================
+2025-11-03 20:44:29,007 - INFO - PROPER SSH BRUTEFORCE DETECTION TRAINING
+2025-11-03 20:44:29,007 - INFO - Using Separate BETH Train/Test Files
+2025-11-03 20:44:29,007 - INFO - ================================================================================
+2025-11-03 20:44:29,007 - INFO - === Loading Separate BETH Files ===
+2025-11-03 20:44:29,007 - INFO - Loading training data: datasets/labelled_training_data.csv
+2025-11-03 20:44:31,372 - INFO - ✓ Training data: 763,144 samples
+2025-11-03 20:44:31,372 - INFO - Loading testing data: datasets/labelled_testing_data.csv
+2025-11-03 20:44:32,019 - INFO - ✓ Testing data: 188,967 samples
+2025-11-03 20:44:32,019 - INFO - 
+--- Training Data Labels ---
+2025-11-03 20:44:32,068 - INFO - 
+sus  evil
+0    0       761875
+1    0         1269
+Name: count, dtype: int64
+2025-11-03 20:44:32,068 - INFO - 
+--- Testing Data Labels ---
+2025-11-03 20:44:32,078 - INFO - 
+sus  evil
+1    1       158432
+0    0        17508
+1    0        13027
+Name: count, dtype: int64
+2025-11-03 20:44:32,089 - INFO - 
+Training attacks: 1,269 / 763,144 (0.17%)
+2025-11-03 20:44:32,090 - INFO - Testing attacks: 171,459 / 188,967 (90.73%)
+2025-11-03 20:44:32,090 - INFO - 
+=== Feature Extraction ===
+2025-11-03 20:44:32,090 - INFO - Extracting features from 763,144 samples...
+2025-11-03 20:44:32,291 - INFO - ✓ Extracted 13 features
+2025-11-03 20:44:32,292 - INFO - Extracting features from 188,967 samples...
+2025-11-03 20:44:32,343 - INFO - ✓ Extracted 13 features
+2025-11-03 20:44:32,343 - INFO - Training features shape: (763144, 13)
+2025-11-03 20:44:32,343 - INFO - Testing features shape: (188967, 13)
+2025-11-03 20:44:32,343 - INFO - 
+=== Feature Scaling ===
+2025-11-03 20:44:32,684 - INFO - ✓ Features scaled
+2025-11-03 20:44:32,684 - INFO - 
+=== Training Random Forest ===
+2025-11-03 20:44:32,684 - INFO - Training model...
+2025-11-03 20:44:39,401 - INFO - 
+=== Training Decision Tree ===
+2025-11-03 20:44:40,056 - INFO - 
+=== Training Isolation Forest (unsupervised) ===
+2025-11-03 20:44:43,255 - INFO - 
+=== Evaluation on Independent Test Set ===
+2025-11-03 20:44:43,975 - INFO - 
+=== Training Logistic Regression (for comparison) ===
+2025-11-03 20:44:44,942 - INFO - 
+📊 REAL Performance Metrics:
+2025-11-03 20:44:44,942 - INFO -   RF Accuracy: 0.9067
+2025-11-03 20:44:44,942 - INFO -   LR Accuracy: 0.9454
+2025-11-03 20:44:44,942 - INFO -   DT Accuracy: 0.9511
+2025-11-03 20:44:44,942 - INFO -   Ensemble (RF+LR+DT+ISO) Accuracy: 0.9453
+2025-11-03 20:44:44,981 - INFO -   Ensemble ROC-AUC:  0.9787
+2025-11-03 20:44:44,981 - INFO - 
+📈 Confusion Matrix:
+2025-11-03 20:44:44,981 - INFO -   True Positives:  161,562
+2025-11-03 20:44:44,981 - INFO -   True Negatives:  17,077
+2025-11-03 20:44:44,981 - INFO -   False Positives: 431
+2025-11-03 20:44:44,981 - INFO -   False Negatives: 9,897
+2025-11-03 20:44:44,981 - INFO -   Precision: 0.9973
+2025-11-03 20:44:44,981 - INFO -   Recall: 0.9423
+2025-11-03 20:44:44,981 - INFO - 
+📋 Detailed Classification Report (Ensemble):
+2025-11-03 20:44:45,058 - INFO - 
+              precision    recall  f1-score   support
+
+      Normal       0.63      0.98      0.77     17508
+      Attack       1.00      0.94      0.97    171459
+
+    accuracy                           0.95    188967
+   macro avg       0.82      0.96      0.87    188967
+weighted avg       0.96      0.95      0.95    188967
+
+2025-11-03 20:44:45,073 - INFO - 
+🔍 Top 10 Feature Importances:
+2025-11-03 20:44:45,079 - INFO - 
+            feature  importance
+2            userId    0.527325
+0         processId    0.121131
+12     is_root_user    0.098765
+1   parentProcessId    0.089197
+7        is_systemd    0.083314
+5       returnValue    0.030065
+6           is_sshd    0.027107
+3           eventId    0.014350
+4           argsNum    0.005732
+11             hour    0.001363
+2025-11-03 20:44:45,081 - INFO - 
+✓ Model saved: models/random_forest_proper.pkl
+2025-11-03 20:44:45,081 - INFO - Logistic Regression Accuracy: 0.9454
+2025-11-03 20:44:45,081 - INFO - Random Forest Accuracy: 0.9067
+2025-11-03 20:44:45,081 - INFO - Decision Tree Accuracy: 0.9511
+2025-11-03 20:44:45,081 - INFO - Ensemble Accuracy: 0.9453
+2025-11-03 20:44:45,082 - INFO - ✓ Logistic Regression saved: models/logistic_regression_proper.pkl
+2025-11-03 20:44:45,082 - INFO - 
+================================================================================
+2025-11-03 20:44:45,082 - INFO - PROPER TRAINING COMPLETED
+2025-11-03 20:44:45,082 - INFO - ================================================================================
+2025-11-03 20:44:45,082 - INFO - Now using truly independent test data!
+2025-11-03 20:44:45,082 - INFO - Training samples: 763,144
+2025-11-03 20:44:45,082 - INFO - Testing samples: 188,967
+2025-11-03 20:44:45,082 - INFO - Final RF Accuracy: 0.9067
+2025-11-03 20:44:45,082 - INFO - Final LR Accuracy: 0.9454
+2025-11-03 20:44:45,082 - INFO - Final DT Accuracy: 0.9511
+2025-11-03 20:44:45,082 - INFO - Final Ensemble Accuracy: 0.9453
