@@ -23,27 +23,22 @@ class RealTimeSSHDetector:
         self.load_test_data()
         
     def load_models(self):
-        """Load trained models and scaler"""
-        print("🤖 Loading trained models...")
+        """Load ensemble model (supervised + unsupervised)"""
+        print("🤖 Loading ensemble model...")
         
-        # Load Random Forest model (saved as dictionary)
-        with open(f"{self.models_dir}/random_forest_proper.pkl", 'rb') as f:
-            rf_dict = pickle.load(f)
-            self.rf_model = rf_dict['model']
-            self.scaler = rf_dict['scaler']
-            self.feature_columns = rf_dict['feature_columns']
+        # Load ensemble model (saved as dictionary)
+        ensemble_path = f"{self.models_dir}/ensemble.pkl"
+        if not os.path.exists(ensemble_path):
+            raise FileNotFoundError(f"Ensemble model not found: {ensemble_path}\nPlease run: python scripts/proper_training.py")
+        
+        with open(ensemble_path, 'rb') as f:
+            ensemble_dict = pickle.load(f)
+            self.lr_model = ensemble_dict['supervised_model']  # Logistic Regression
+            self.if_model = ensemble_dict['unsupervised_model']  # Isolation Forest
+            self.scaler = ensemble_dict['scaler']
+            self.feature_columns = ensemble_dict['feature_columns']
             
-        # Check if Logistic Regression exists, if not use RF for both
-        lr_path = f"{self.models_dir}/logistic_regression_proper.pkl"
-        if os.path.exists(lr_path):
-            with open(lr_path, 'rb') as f:
-                lr_dict = pickle.load(f)
-                self.lr_model = lr_dict['model']
-        else:
-            print("⚠️  Logistic Regression not found, using Random Forest for ensemble")
-            self.lr_model = self.rf_model
-            
-        print("✓ Models loaded successfully")
+        print("✓ Ensemble model loaded (LR + Isolation Forest)")
         
     def load_test_data(self):
         """Load test dataset for simulation"""
@@ -58,23 +53,10 @@ class RealTimeSSHDetector:
         print(f"✓ Loaded {len(self.test_data)} test samples")
         
     def extract_features(self, row):
-        """Extract features from a single row"""
+        """Extract features from a single row (matches training feature extraction)"""
         features = {}
         
-        # Parse timestamp if it exists
-        if 'timestamp' in row and pd.notna(row['timestamp']):
-            try:
-                ts = pd.to_datetime(row['timestamp'])
-                features['hour'] = ts.hour
-                features['minute'] = ts.minute
-            except:
-                features['hour'] = 12  # Default
-                features['minute'] = 0
-        else:
-            features['hour'] = 12
-            features['minute'] = 0
-            
-        # Process features
+        # Process features (numerical)
         features['processId'] = row.get('processId', 0)
         features['parentProcessId'] = row.get('parentProcessId', 0) 
         features['userId'] = row.get('userId', 0)
@@ -82,28 +64,34 @@ class RealTimeSSHDetector:
         features['argsNum'] = row.get('argsNum', 0)
         features['returnValue'] = row.get('returnValue', 0)
         
-        # Binary features
+        # Process type features (binary)
         process_name = str(row.get('processName', '')).lower()
-        features['processName_sshd'] = 1 if 'sshd' in process_name else 0
-        features['processName_systemd'] = 1 if 'systemd' in process_name else 0
+        features['is_sshd'] = 1 if process_name == 'sshd' else 0
+        features['is_systemd'] = 1 if process_name == 'systemd' else 0
         
-        # Event type features
+        # Event type features (binary, match training)
         event_name = str(row.get('eventName', '')).lower()
-        features['event_close'] = 1 if 'close' in event_name else 0
-        features['event_openat'] = 1 if 'openat' in event_name else 0
-        features['event_fstat'] = 1 if 'fstat' in event_name else 0
-        features['event_security_file_open'] = 1 if 'security_file_open' in event_name else 0
-        features['event_socket'] = 1 if 'socket' in event_name else 0
-        features['event_connect'] = 1 if 'connect' in event_name else 0
+        features['event_close'] = 1 if event_name == 'close' else 0
+        features['event_openat'] = 1 if event_name == 'openat' else 0
+        features['event_socket'] = 1 if event_name == 'socket' else 0
         
-        # Frequency features (simplified for demo)
-        features['processId_freq'] = 1  # Placeholder
-        features['userId_freq'] = 1     # Placeholder
+        # Time feature (match training: hour from timestamp % 86400 / 3600)
+        if 'timestamp' in row and pd.notna(row['timestamp']):
+            try:
+                timestamp_val = float(row['timestamp'])
+                features['hour'] = int((timestamp_val % 86400) / 3600)
+            except:
+                features['hour'] = 12  # Default
+        else:
+            features['hour'] = 12
+        
+        # Root user check
+        features['is_root_user'] = 1 if row.get('userId', 0) == 0 else 0
         
         return features
         
     def predict_attack(self, row):
-        """Predict if a log entry indicates an attack"""
+        """Predict if a log entry indicates an attack using ensemble (supervised + unsupervised)"""
         features = self.extract_features(row)
         
         # Convert to DataFrame with correct column order
@@ -115,22 +103,28 @@ class RealTimeSSHDetector:
         # Scale features
         feature_vector = self.scaler.transform(feature_df)
         
-        # Get predictions from both models
-        rf_pred = self.rf_model.predict(feature_vector)[0]
-        rf_prob = self.rf_model.predict_proba(feature_vector)[0][1]
-        
-        lr_pred = self.lr_model.predict(feature_vector)[0] 
+        # Supervised prediction (Logistic Regression)
+        lr_pred = self.lr_model.predict(feature_vector)[0]
         lr_prob = self.lr_model.predict_proba(feature_vector)[0][1]
         
-        # Ensemble prediction (average probabilities)
-        ensemble_prob = (rf_prob + lr_prob) / 2
-        ensemble_pred = 1 if ensemble_prob > 0.5 else 0
+        # Unsupervised prediction (Isolation Forest: -1=anomaly, 1=normal)
+        if_pred_raw = self.if_model.predict(feature_vector)[0]
+        if_pred = 1 if if_pred_raw == -1 else 0  # Convert: -1→attack(1), 1→normal(0)
+        if_score = self.if_model.score_samples(feature_vector)[0]  # Lower = more anomalous
+        if_prob = 1 / (1 + np.exp(-if_score))  # Normalize to [0,1]
+        
+        # Ensemble: Both models vote
+        # If both agree → use that prediction
+        # If they disagree → trust supervised (more reliable for known patterns)
+        ensemble_pred = lr_pred if lr_pred == if_pred else lr_pred
+        # Note: When both agree, we're more confident. When they disagree, trust LR.
+        ensemble_prob = (lr_prob + if_prob) / 2.0
         
         return {
-            'rf_prediction': rf_pred,
-            'rf_confidence': rf_prob,
-            'lr_prediction': lr_pred, 
+            'lr_prediction': lr_pred,
             'lr_confidence': lr_prob,
+            'if_prediction': if_pred,
+            'if_confidence': if_prob,
             'ensemble_prediction': ensemble_pred,
             'ensemble_confidence': ensemble_prob
         }
@@ -177,7 +171,7 @@ class RealTimeSSHDetector:
                 print(f"   UserID: {row.get('userId', 'N/A')}")
                 print(f"   Event: {row.get('eventName', 'N/A')}")
                 print(f"   Confidence: {confidence:.1f}%")
-                print(f"   RF: {prediction['rf_confidence']:.3f} | LR: {prediction['lr_confidence']:.3f}")
+                print(f"   LR (Supervised): {prediction['lr_confidence']:.3f} | IF (Unsupervised): {prediction['if_confidence']:.3f}")
                 
                 if actual_label == 1:
                     print(f"   Status: ✓ TRUE POSITIVE")

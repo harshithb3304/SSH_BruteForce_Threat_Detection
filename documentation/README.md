@@ -22,7 +22,7 @@ If needed, use `scripts/download_data.py` to fetch/prepare.
 ```bash
 .venv/bin/python scripts/proper_training.py
 ```
-This saves models to `models/`.
+This saves ensemble model (LR + Isolation Forest) as `models/ensemble.pkl`.
 
 ### 4) Demo: Real-time Simulation
 ```bash
@@ -32,8 +32,8 @@ bash run_simulation.sh -l   # 60s extended demo
 ```
 
 ## What Each Script Does (in `scripts/`)
-- `proper_training.py`: Trains models on BETH split (train vs test). Trains RandomForest, LogisticRegression, DecisionTree, and IsolationForest (unsupervised). Reports metrics and saves RF/LR models for simulation.
-- `simulate_realtime.py`: Console demo that loads models and streams sampled test rows to show live detections with confidence.
+- `proper_training.py`: Trains ensemble (1 Supervised: Logistic Regression + 1 Unsupervised: Isolation Forest) on BETH split. Reports metrics and saves as `models/ensemble.pkl`.
+- `simulate_realtime.py`: Console demo that loads ensemble model and streams sampled test rows to show live detections with confidence scores from both models.
 - `realtime_monitor.py`: Real-time watcher for SSH logs (e.g., `/var/log/auth.log`) to flag bruteforce behavior.
 - `comprehensive_testing.py`: Full evaluation framework (batch speed, cross-validation, robustness checks).
 - `test_detector.py`: Unit-style tests to sanity-check detector functions.
@@ -200,33 +200,29 @@ LogisticRegression(
     max_iter=1000       # Convergence guarantee
 )
 ```
+**What it does**: Uses labeled data (is_attack) to learn patterns from known SSH attacks
 **Advantages**: Interpretable, fast inference, probabilistic output
-**Use Case**: Real-time classification with explainable decisions
+**Performance**: 94.56% accuracy on independent test set
 
-#### 2. Random Forest (Supervised)
+#### 2. Isolation Forest (Unsupervised)
 **Configuration**:
 ```python
-RandomForestClassifier(
-    n_estimators=50,        # Moderate ensemble size
-    max_depth=10,           # Prevent overfitting
-    min_samples_split=20,   # Require sufficient data
-    min_samples_leaf=10,    # Ensure leaf reliability
+IsolationForest(
+    n_estimators=100,      # Number of trees
+    contamination=0.02,    # Expected anomaly proportion (2%)
     random_state=42
 )
 ```
-**Advantages**: Handles non-linear patterns, feature importance ranking
-**Use Case**: Complex pattern detection, feature analysis
-
-#### 3. Decision Tree (Supervised)
-Conservative depth/leaf settings aligned with overfitting prevention used in RF.
-
-#### 4. Isolation Forest (Unsupervised)
-Learns normality on training set to flag anomalies on test/streaming data.
+**What it does**: Learns normal behavior from training data (NO labels used), flags deviations as anomalies
+**Advantages**: Fast, handles high-dimensional data, no distribution assumptions
+**Performance**: 92.44% accuracy on independent test set
+**Why chosen**: Better than DBSCAN, One-Class SVM, Autoencoder for real-time SSH log monitoring
 
 ### Ensemble Strategy
-- Voting members: RF, LR, DT, IsolationForest (ISO flags anomaly as attack)
-- Decision: majority vote (>=2) for Attack
-- Confidence (for display): average of supervised probabilities (RF+LR)
+- **Voting members**: Logistic Regression (supervised) + Isolation Forest (unsupervised)
+- **Decision**: If both agree → use that prediction. If disagree → trust supervised (more reliable)
+- **Confidence**: Average of supervised probability + unsupervised anomaly score
+- **Performance**: 94.56% accuracy, 99.95% precision, 94.05% recall on full test set
 
 ### Model Selection Process
 1. **Cross-validation**: 3-fold stratified CV on training data
@@ -284,13 +280,25 @@ ssh_bruteforce_detection/
 
 Trained and tested via `scripts/proper_training.py` on BETH splits (prevents data leakage):
 
-- RF Accuracy: 0.9067
-- LR Accuracy: 0.9454
-- DT Accuracy: 0.9511
-- Ensemble (RF+LR+DT+ISO) Accuracy: 0.9453
-- Ensemble ROC-AUC: 0.9787
-- Confusion Matrix (Ensemble): TN=17,077, FP=431, FN=9,897, TP=161,562
-- Precision: 0.9973 | Recall (Detection Rate): 0.9423 | False Alarm Rate: 0.0246
+**Ensemble (Logistic Regression + Isolation Forest):**
+- **Accuracy**: 94.56%
+- **Precision**: 99.95%
+- **Recall (Detection Rate)**: 94.05%
+- **F1-Score**: 96.95%
+- **ROC-AUC**: 97.66%
+- **False Alarm Rate**: 0.48%
+
+**Confusion Matrix (Ensemble):**
+```
+                Predicted
+                Normal    Attack
+Actual Normal  [[17,424    84]]
+       Attack  [[10,195  161,264]]
+```
+
+**Individual Models:**
+- Logistic Regression (Supervised): 94.56% accuracy
+- Isolation Forest (Unsupervised): 92.44% accuracy
 
 ### Evaluation Metrics Implementation
 

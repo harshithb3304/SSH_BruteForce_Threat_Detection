@@ -41,7 +41,7 @@ show_banner() {
     echo "║          SSH BRUTEFORCE DETECTION SYSTEM                ║"
     echo "║                Real-Time Simulation                     ║"
     echo "║                                                          ║"
-    echo "║  Model: Ensemble (Random Forest + Logistic Regression) ║"
+    echo "║  Model: Ensemble (Logistic Regression + Isolation Forest) ║"
     echo "║  Accuracy: 90.67% RF | 94.54% LR                       ║"
     echo "║  Processing Speed: 82,434 samples/sec                   ║"
     echo "╚══════════════════════════════════════════════════════════╝"
@@ -64,14 +64,9 @@ check_prerequisites() {
         exit 1
     fi
     
-    # Check if models exist
-    if [ ! -f "$PROJECT_DIR/models/random_forest_proper.pkl" ]; then
-        print_error "Random Forest model not found"
-        exit 1
-    fi
-    
-    if [ ! -f "$PROJECT_DIR/models/logistic_regression_proper.pkl" ]; then
-        print_error "Logistic Regression model not found"
+    # Check if ensemble model exists
+    if [ ! -f "$PROJECT_DIR/models/ensemble.pkl" ]; then
+        print_error "Ensemble model not found. Please run: python scripts/proper_training.py"
         exit 1
     fi
     

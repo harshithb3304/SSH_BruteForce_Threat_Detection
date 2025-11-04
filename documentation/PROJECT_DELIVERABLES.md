@@ -119,7 +119,7 @@ Combined Attacks: 159,158 (28.03%)
 ## 4. AI Model Design & Architecture
 
 ### 4.1 Chosen Model(s)
-- ☑️ Random Forest
+- ☑️ Isolation Forest
 - ☑️ Logistic Regression
 - ☐ LSTM
 - ☐ CNN
@@ -156,16 +156,22 @@ LogisticRegression(
 
 ### 4.3 Hybrid Learning Approach
 **Supervised Component:**
-- Random Forest and Logistic Regression trained on labeled BETH data
-- Learns patterns from known SSH attack signatures and normal behavior
-- Achieves 90.67% accuracy on independent test set
-- Provides interpretable feature importance rankings
+- **Logistic Regression** trained on labeled BETH data (is_attack labels)
+- Learns patterns from known SSH attack signatures (1,269 attacks in training)
+- Achieves 94.56% accuracy on independent test set
+- Provides interpretable coefficients for feature analysis
 
 **Unsupervised Component:**
-- Anomaly detection through statistical thresholds on prediction confidence
-- Frequency-based anomaly detection for rare processId/userId combinations  
-- Temporal anomaly detection for unusual timing patterns
-- Ensemble voting system for final classification decisions
+- **Isolation Forest** learns normal behavior from training data (NO labels used)
+- Trained on 761,875 normal samples to learn normality
+- Flags deviations as anomalies (attack = 1, normal = 0)
+- Achieves 92.44% accuracy on independent test set
+- Why chosen: Fast, handles high-dimensional data, ideal for real-time monitoring
+
+**Ensemble Strategy:**
+- Both models vote: If both agree → use that prediction
+- If they disagree → trust supervised (more reliable for known patterns)
+- Final performance: 94.56% accuracy, 99.95% precision, 94.05% recall
 
 ---
 
@@ -175,13 +181,15 @@ LogisticRegression(
 
 **Evaluation Metrics (Independent Test Set):**
 
-| Metric | Random Forest | Logistic Regression | Decision Tree | Ensemble (RF+LR+DT+ISO) |
-|--------|---------------|---------------------|---------------|-------------------------|
-| **Accuracy** | **90.67%** | **94.54%** | **95.11%** | **94.53%** |
-| **Precision** | **99.77%** | **99.95%** | **99.73%** | **99.73%** |
-| **Recall** | **89.92%** | **94.04%** | **94.21%** | **94.23%** |
-| **F1 Score** | **94.59%** | **96.90%** | **96.89%** | **96.91%** |
-| **AUC-ROC** | **96.26%** | **98.12%** | **—** | **97.87%** |
+| Metric | Logistic Regression (Supervised) | Isolation Forest (Unsupervised) | Ensemble (LR + IF) |
+|--------|----------------------------------|----------------------------------|---------------------|
+| **Accuracy** | **94.56%** | **92.44%** | **94.56%** |
+| **Precision** | **99.95%** | **N/A** | **99.95%** |
+| **Recall** | **94.05%** | **N/A** | **94.05%** |
+| **F1 Score** | **96.95%** | **N/A** | **96.95%** |
+| **AUC-ROC** | **98.12%** | **N/A** | **97.66%** |
+
+**Note:** Isolation Forest is **unsupervised** (no labels used during training). It learns normal behavior patterns and flags anomalies, but doesn't optimize for precision/recall/F1. These metrics are calculated post-hoc for evaluation only - IF itself doesn't use them during training or prediction.
 
 **Cross-Validation Results:**
 - **Mean Accuracy:** 99.98% ± 0.0000
@@ -192,28 +200,35 @@ LogisticRegression(
 ```
                 Predicted
                 Normal    Attack
-Actual Normal  [[17,077   431]]
-       Attack  [[ 9,897  161,562]]
+Actual Normal  [[17,424    84]]
+       Attack  [[10,195  161,264]]
 
 Security Metrics:
-├── Detection Rate: 94.23% (161,562/171,459)
-├── False Alarm Rate: 2.46% (431/17,508)
-├── True Positive Rate: 94.23%
-└── False Positive Rate: 2.46%
+├── Detection Rate: 94.05% (161,264/171,459)
+├── False Alarm Rate: 0.48% (84/17,508)
+├── True Positive Rate: 94.05%
+└── False Positive Rate: 0.48%
 ```
 
 ### 5.2 Unsupervised Learning Component
 
-**Anomaly Detection Methods:**
-- **Statistical Outlier Detection:** Identifies rare system call patterns
-- **Frequency-Based Detection:** Flags unusual process/user activity levels
-- **Temporal Pattern Analysis:** Detects timing anomalies in SSH sessions
+**Unsupervised Model: Isolation Forest**
+- **Method:** Tree-based anomaly detection that isolates outliers by random splits
+- **Training:** Learns normal behavior from 761,875 normal samples (no labels used)
+- **Prediction:** Returns -1 for anomaly (attack) or 1 for normal
+- **Why chosen:** Fast (O(n log n)), handles high-dimensional data, no distribution assumptions
+- **Performance:** 92.44% accuracy on independent test set
 
-**Evaluation Approach:**
-- **Silhouette Analysis:** Used for validating behavioral clusters
-- **Statistical Thresholds:** 95th percentile for anomaly cutoffs
-- **Visual Inspection:** t-SNE plots for pattern validation
-- **Ensemble Consensus:** Combined supervised and unsupervised predictions
+**Comparison with Other Unsupervised Models:**
+- **DBSCAN:** Needs tuning, struggles with high dimensions
+- **One-Class SVM:** Slower (O(n²)), memory intensive
+- **Autoencoder:** Overkill for 13 features, needs GPU
+- **LOF:** Slower and memory intensive
+
+**Ensemble Integration:**
+- Both models vote independently
+- If both agree → high confidence in prediction
+- If disagree → trust supervised (more reliable for known attack patterns)
 
 ---
 

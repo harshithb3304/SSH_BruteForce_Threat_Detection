@@ -106,3 +106,141 @@ weighted avg       0.96      0.95      0.95    188967
 2025-11-03 20:44:45,082 - INFO - Final LR Accuracy: 0.9454
 2025-11-03 20:44:45,082 - INFO - Final DT Accuracy: 0.9511
 2025-11-03 20:44:45,082 - INFO - Final Ensemble Accuracy: 0.9453
+2025-11-04 10:25:59,607 - INFO - ================================================================================
+2025-11-04 10:25:59,607 - INFO - SSH BRUTEFORCE DETECTION - ENSEMBLE TRAINING
+2025-11-04 10:25:59,607 - INFO - 1 Supervised (Logistic Regression) + 1 Unsupervised (Isolation Forest)
+2025-11-04 10:25:59,607 - INFO - Using Separate BETH Train/Test Files
+2025-11-04 10:25:59,607 - INFO - ================================================================================
+2025-11-04 10:25:59,608 - INFO - === Loading Separate BETH Files ===
+2025-11-04 10:25:59,608 - INFO - Loading training data: datasets/labelled_training_data.csv
+2025-11-04 10:26:03,554 - INFO - ✓ Training data: 763,144 samples
+2025-11-04 10:26:03,554 - INFO - Loading testing data: datasets/labelled_testing_data.csv
+2025-11-04 10:26:04,677 - INFO - ✓ Testing data: 188,967 samples
+2025-11-04 10:26:04,677 - INFO - 
+--- Training Data Labels ---
+2025-11-04 10:26:04,752 - INFO - 
+sus  evil
+0    0       761875
+1    0         1269
+Name: count, dtype: int64
+2025-11-04 10:26:04,752 - INFO - 
+--- Testing Data Labels ---
+2025-11-04 10:26:04,774 - INFO - 
+sus  evil
+1    1       158432
+0    0        17508
+1    0        13027
+Name: count, dtype: int64
+2025-11-04 10:26:04,792 - INFO - 
+Training attacks: 1,269 / 763,144 (0.17%)
+2025-11-04 10:26:04,793 - INFO - Testing attacks: 171,459 / 188,967 (90.73%)
+2025-11-04 10:26:04,793 - INFO - 
+=== Feature Extraction ===
+2025-11-04 10:26:04,793 - INFO - Extracting features from 763,144 samples...
+2025-11-04 10:26:05,055 - INFO - ✓ Extracted 13 features
+2025-11-04 10:26:05,056 - INFO - Extracting features from 188,967 samples...
+2025-11-04 10:26:05,132 - INFO - ✓ Extracted 13 features
+2025-11-04 10:26:05,132 - INFO - Training features shape: (763144, 13)
+2025-11-04 10:26:05,132 - INFO - Testing features shape: (188967, 13)
+2025-11-04 10:26:05,133 - INFO - 
+=== Feature Scaling ===
+2025-11-04 10:26:05,737 - INFO - ✓ Features scaled
+2025-11-04 10:26:05,737 - INFO - 
+=== Training Supervised Model: Logistic Regression ===
+2025-11-04 10:26:05,737 - INFO - Uses labeled data (is_attack) to learn patterns
+2025-11-04 10:26:05,737 - INFO - Training Logistic Regression...
+2025-11-04 10:26:07,443 - INFO - ✓ Logistic Regression trained
+2025-11-04 10:26:07,444 - INFO - 
+=== Training Unsupervised Model: Isolation Forest ===
+2025-11-04 10:26:07,444 - INFO - Isolation Forest learns normal behavior from training data (NO labels used)
+2025-11-04 10:26:07,444 - INFO - Why Isolation Forest? See explanation at end of training log.
+2025-11-04 10:26:07,514 - INFO - Training on 761,875 normal samples (to learn normal behavior)
+2025-11-04 10:26:07,514 - INFO - Training Isolation Forest...
+2025-11-04 10:26:13,709 - INFO - ✓ Isolation Forest trained
+2025-11-04 10:26:13,709 - INFO - 
+=== Evaluation on Independent Test Set ===
+2025-11-04 10:26:15,236 - INFO - 
+📊 Performance Metrics:
+2025-11-04 10:26:15,236 - INFO -   Logistic Regression (Supervised): 0.9456
+2025-11-04 10:26:15,236 - INFO -   Isolation Forest (Unsupervised):   0.9244
+2025-11-04 10:26:15,236 - INFO -   Ensemble (LR + IF):                0.9456
+2025-11-04 10:26:15,260 - INFO -   Ensemble ROC-AUC:                0.9766
+2025-11-04 10:26:15,260 - INFO - 
+📈 Confusion Matrix (Ensemble):
+2025-11-04 10:26:15,260 - INFO -   True Positives:  161,264
+2025-11-04 10:26:15,261 - INFO -   True Negatives:  17,424
+2025-11-04 10:26:15,261 - INFO -   False Positives: 84
+2025-11-04 10:26:15,261 - INFO -   False Negatives: 10,195
+2025-11-04 10:26:15,261 - INFO -   Precision: 0.9995
+2025-11-04 10:26:15,261 - INFO -   Recall (Detection Rate): 0.9405
+2025-11-04 10:26:15,261 - INFO -   False Alarm Rate: 0.0048
+2025-11-04 10:26:15,261 - INFO - 
+📋 Detailed Classification Report (Ensemble):
+2025-11-04 10:26:15,308 - INFO - 
+              precision    recall  f1-score   support
+
+      Normal       0.63      1.00      0.77     17508
+      Attack       1.00      0.94      0.97    171459
+
+    accuracy                           0.95    188967
+   macro avg       0.82      0.97      0.87    188967
+weighted avg       0.97      0.95      0.95    188967
+
+2025-11-04 10:26:15,308 - INFO - 
+=== Saving Ensemble Model ===
+2025-11-04 10:26:15,356 - INFO - ✓ Ensemble model saved: models/ensemble.pkl
+2025-11-04 10:26:15,356 - INFO - 
+================================================================================
+2025-11-04 10:26:15,356 - INFO - WHY ISOLATION FOREST? (vs Other Unsupervised Models)
+2025-11-04 10:26:15,356 - INFO - ================================================================================
+2025-11-04 10:26:15,356 - INFO - 
+    Isolation Forest vs Other Unsupervised Models:
+    
+    1. ISOLATION FOREST (Chosen) ✅
+       - Fast training & inference (O(n log n))
+       - Handles high-dimensional data well (13 features)
+       - No assumptions about data distribution
+       - Works well with imbalanced data (99.83% normal in training)
+       - Good for anomaly detection in network logs
+       - Memory efficient (tree-based)
+    
+    2. DBSCAN (Clustering-based)
+       - Needs tuning of eps (distance) and min_samples
+       - Struggles with high-dimensional data (curse of dimensionality)
+       - Slower on large datasets
+       - Hard to interpret clusters
+    
+    3. One-Class SVM
+       - Slower training (O(n²) complexity)
+       - Requires kernel selection (RBF, linear, etc.)
+       - Memory intensive for large datasets
+       - Less interpretable
+    
+    4. Autoencoder (Deep Learning)
+       - Requires more data and GPU
+       - Slower training
+       - Overkill for this feature space (13 features)
+       - Harder to deploy
+    
+    5. Local Outlier Factor (LOF)
+       - Slower than Isolation Forest
+       - Sensitive to parameter k (neighbors)
+       - Memory intensive
+    
+    Conclusion: Isolation Forest is ideal for:
+    - Real-time SSH log monitoring (fast inference)
+    - High-dimensional feature spaces
+    - Imbalanced datasets
+    - Production deployment (lightweight, interpretable)
+    
+2025-11-04 10:26:15,356 - INFO - 
+================================================================================
+2025-11-04 10:26:15,356 - INFO - ENSEMBLE TRAINING COMPLETED
+2025-11-04 10:26:15,356 - INFO - ================================================================================
+2025-11-04 10:26:15,356 - INFO - Training samples: 763,144
+2025-11-04 10:26:15,356 - INFO - Testing samples: 188,967
+2025-11-04 10:26:15,356 - INFO - Supervised (LR) Accuracy: 0.9456
+2025-11-04 10:26:15,356 - INFO - Unsupervised (IF) Accuracy: 0.9244
+2025-11-04 10:26:15,356 - INFO - Ensemble Accuracy: 0.9456
+2025-11-04 10:26:15,356 - INFO - 
+Model saved as: models/ensemble.pkl
