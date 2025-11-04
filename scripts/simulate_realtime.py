@@ -204,6 +204,15 @@ class RealTimeSSHDetector:
 
 def main():
     """Main simulation function"""
+    import argparse
+    
+    parser = argparse.ArgumentParser(description='SSH Bruteforce Detection - Real-Time Simulation')
+    parser.add_argument('--duration', type=int, default=30, 
+                       help='Simulation duration in seconds (default: 30)')
+    parser.add_argument('--sample-rate', type=int, default=5,
+                       help='Number of samples per second (default: 5)')
+    args = parser.parse_args()
+    
     models_dir = "/home/harshith/Projects/CNS_Lab/SSH_BruteForce_Threat_Detection/models"
     
     # Create detector
@@ -212,14 +221,18 @@ def main():
     # Run simulation
     print("🎯 SSH Bruteforce Detection - Real-Time Simulation")
     print("📡 Simulating live SSH log monitoring...")
+    print(f"⏱️  Duration: {args.duration} seconds")
+    print(f"📈 Sample Rate: {args.sample_rate} samples/second")
     print("")
     
     try:
-        detector.simulate_realtime_monitoring(duration_seconds=15, sample_rate=5)
+        detector.simulate_realtime_monitoring(duration_seconds=args.duration, sample_rate=args.sample_rate)
     except KeyboardInterrupt:
         print("\n🛑 Simulation stopped by user")
     except Exception as e:
         print(f"\n❌ Error during simulation: {e}")
+        import traceback
+        traceback.print_exc()
 
 if __name__ == "__main__":
     main()

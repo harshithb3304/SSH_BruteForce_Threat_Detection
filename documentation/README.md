@@ -42,7 +42,7 @@ bash run_simulation.sh -l   # 60s extended demo
 - `download_data.py`: Dataset download/prepare helpers (e.g., via Kaggle API).
 
 ## Project Overview
-This project implements an AI-based real-time threat detection system to identify **SSH-Bruteforce attacks** using machine learning with proper train/test separation and a hybrid supervised + unsupervised ensemble.
+This project implements an AI-based real-time threat detection system to identify **SSH-Bruteforce attacks** using machine learning with proper train/test separation. The final ensemble combines **1 Supervised model (Logistic Regression) + 1 Unsupervised model (Isolation Forest)** for robust detection.
 
 ## Attack Type: SSH-Bruteforce
 SSH Bruteforce attacks involve automated attempts to gain unauthorized access to systems by systematically trying various username/password combinations against SSH services. These attacks are characterized by:
@@ -225,22 +225,22 @@ IsolationForest(
 - **Performance**: 94.56% accuracy, 99.95% precision, 94.05% recall on full test set
 
 ### Model Selection Process
-1. **Cross-validation**: 3-fold stratified CV on training data
-2. **Performance metric**: F1-score for balanced evaluation
-3. **Final selection**: Best CV performance becomes primary model
-4. **Ensemble option**: Voting classifier for critical deployments
+1. **Supervised Model**: Logistic Regression selected for best accuracy (94.56%) and speed
+2. **Unsupervised Model**: Isolation Forest selected for fast anomaly detection (92.44% accuracy)
+3. **Ensemble**: Combined LR + IF for robust detection (94.56% accuracy, 99.95% precision)
+4. **Rationale**: Supervised learns known patterns, unsupervised catches novel anomalies
 
 ## Model Parameters and Hyperparameters
 
-### Feature Selection
-- **Method**: SelectKBest with f_classif scoring
-- **Features selected**: Top 10 most discriminative features
-- **Rationale**: Reduce overfitting and improve interpretability
+### Feature Engineering
+- **Total Features**: 13 features extracted from BETH dataset
+- **Feature Types**: Numerical (processId, userId, eventId, etc.) + Binary (is_sshd, event_close, etc.)
+- **Rationale**: Simple features to avoid overfitting, sufficient for detection
 
 ### Data Preprocessing
-- **Scaler**: RobustScaler (robust to outliers)
-- **Missing values**: Forward fill for temporal data
-- **Categorical encoding**: Binary encoding for categorical features
+- **Scaler**: StandardScaler for numerical features
+- **Missing values**: Forward fill for temporal continuity
+- **Categorical encoding**: Binary encoding for categorical features (processName, eventName)
 
 ### Training Configuration
 - **Datasets**: Independent BETH splits
@@ -325,11 +325,11 @@ Actual Normal   [[TN     FP]]
        Attack   [[FN     TP]]
 ```
 
-**Typical Results**:
-- True Negatives (TN): ~1500-2000 (normal traffic correctly identified)
-- True Positives (TP): ~400-600 (attacks correctly detected)
-- False Positives (FP): <50 (normal traffic misclassified)
-- False Negatives (FN): <100 (missed attacks)
+**Actual Results (Ensemble - LR + IF):**
+- True Negatives (TN): 17,424 (normal traffic correctly identified)
+- True Positives (TP): 161,264 (attacks correctly detected)
+- False Positives (FP): 84 (normal traffic misclassified - very low!)
+- False Negatives (FN): 10,195 (missed attacks - 5.95% of total attacks)
 
 ### External Validation Results
 Testing on completely unseen datasets from different environments:

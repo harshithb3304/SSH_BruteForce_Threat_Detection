@@ -7,6 +7,44 @@
 
 ---
 
+## 0. Attack Description & Behavior
+
+### 0.1 SSH Bruteforce Attack Overview
+SSH Bruteforce attacks are automated attempts to gain unauthorized access to systems by systematically trying various username/password combinations against SSH (Secure Shell) services.
+
+### 0.2 Attack Characteristics
+- **Automated Attack Patterns**: Systematic, programmatic attempts to gain unauthorized access
+- **High Frequency Attempts**: Multiple login attempts within short time windows (typically >5 attempts/minute)
+- **Administrative Account Targeting**: Focus on privileged accounts (root, admin, user, test)
+- **Dictionary-Based Attacks**: Use of common username/password combinations from dictionaries
+- **Distributed Sources**: Attacks often originate from multiple IP addresses to evade simple rate limiting
+- **Rapid Successive Failed Logins**: Multiple failed authentication attempts from the same source IP
+
+### 0.3 Attack Behavior Patterns
+**Temporal Patterns:**
+- Attacks show clustering during specific hours (off-peak hours common)
+- High-frequency bursts indicate automated attack patterns
+
+**Authentication Patterns:**
+- Systematic enumeration of common usernames (admin, root, user, test, guest)
+- Dictionary-based password attacks using common passwords
+- Invalid user attempts followed by password attempts
+- Connection attempts without proper authentication
+
+**System-Level Indicators:**
+- High frequency of connection attempts (connect events)
+- Failed operations indicated by error codes (returnValue: -1, -13)
+- SSH daemon (sshd) processes heavily involved
+- Root user (userId=0) shows higher attack correlation
+
+### 0.4 Threat Impact
+- **Prevalence**: 80%+ of SSH services experience bruteforce attempts
+- **Success Rate**: 2-5% success rate against weak credential systems
+- **Economic Impact**: Average $4.35M per successful data breach (IBM Security Report 2023)
+- **Detection Challenge**: Distinguishing legitimate failed logins from malicious attempts
+
+---
+
 ## 1. Dataset Description & Justification
 
 ### 1.1 Dataset Source
@@ -127,18 +165,7 @@ Combined Attacks: 159,158 (28.03%)
 - ☑️ Hybrid/Ensemble
 - ☐ Other: ___________
 
-**Primary Model: Random Forest Classifier**
-```python
-RandomForestClassifier(
-    n_estimators=50,        # Moderate ensemble size
-    max_depth=10,           # Prevent overfitting
-    min_samples_split=20,   # Require sufficient evidence
-    min_samples_leaf=10,    # Ensure reliable predictions
-    random_state=42         # Reproducibility
-)
-```
-
-**Secondary Model: Logistic Regression**
+**Supervised Model: Logistic Regression**
 ```python
 LogisticRegression(
     C=0.1,              # Strong L2 regularization
@@ -262,8 +289,8 @@ Security Metrics:
 
 ### 7.1 Observations
 **Model Effectiveness:**
-- **High Precision (99.77%+):** Minimizes false alarms for operational deployment
-- **Good Recall (89.92%+):** Catches majority of SSH bruteforce attempts  
+- **High Precision (99.95%):** Minimizes false alarms for operational deployment
+- **Good Recall (94.05%):** Catches majority of SSH bruteforce attempts  
 - **Real-time Capable:** Sub-second response suitable for production environments
 - **Robust Performance:** Stable across different validation approaches
 
@@ -274,7 +301,7 @@ Security Metrics:
 - Provided interpretable feature importance for security analysis
 
 **Weaknesses:**
-- 10.08% false negative rate means some attacks go undetected
+- 5.95% false negative rate means some attacks go undetected (10,195 missed attacks)
 - Domain-specific training limits generalization to other attack types
 - Requires periodic retraining to adapt to evolving attack patterns
 
@@ -298,7 +325,53 @@ Security Metrics:
 
 ---
 
-## 8. Code & Resources
+## 8. Methodology, Results & Conclusions
+
+### 8.1 Training Methodology
+**Code Location**: `scripts/proper_training.py`
+
+**Training Process:**
+1. **Data Loading**: Load separate train/test files (prevents data leakage)
+   - Training: `datasets/labelled_training_data.csv` (763,144 samples)
+   - Testing: `datasets/labelled_testing_data.csv` (188,967 samples)
+
+2. **Feature Extraction**: Extract 13 features per sample
+   - Temporal features (hour, minute)
+   - Process features (processId, parentProcessId, userId)
+   - Event features (eventId, argsNum, returnValue)
+   - Binary indicators (processName_sshd, processName_systemd, event_*)
+
+3. **Feature Scaling**: Apply StandardScaler normalization
+
+4. **Model Training**:
+   - **Logistic Regression (Supervised)**: Trained on labeled data (is_attack)
+   - **Isolation Forest (Unsupervised)**: Trained on normal samples only (761,875 samples)
+
+5. **Ensemble**: Both models vote, disagreement resolved by trusting supervised
+
+6. **Model Persistence**: Saved as `models/ensemble.pkl`
+
+### 8.2 Results Summary
+**Final Performance (Independent Test Set):**
+- **Ensemble Accuracy**: 94.56%
+- **Precision**: 99.95% (only 84 false positives out of 17,508 normal events)
+- **Recall**: 94.05% (161,264 out of 171,459 attacks detected)
+- **F1-Score**: 96.95%
+- **ROC-AUC**: 97.66%
+- **False Alarm Rate**: 0.48%
+
+**Key Achievements:**
+- Successfully prevented overfitting through proper train/test separation
+- Achieved realistic performance metrics on independent datasets
+- Demonstrated scalable real-time processing capabilities
+- Combined supervised (known patterns) + unsupervised (novel anomalies) learning
+
+### 8.3 Conclusions
+The hybrid ensemble approach (Logistic Regression + Isolation Forest) successfully detects SSH bruteforce attacks with high precision (99.95%) and good recall (94.05%). The system is production-ready with sub-second response times and minimal false alarms. The unsupervised component (Isolation Forest) provides additional protection against novel attack patterns not seen in training data.
+
+---
+
+## 9. Code & Resources
 
 - **GitHub Repository:** https://github.com/harshithb3304/SSH_BruteForce_Threat_Detection
 - **Dataset Source Link:** https://www.kaggle.com/datasets/katehighnam/beth-dataset
@@ -317,11 +390,13 @@ SSH_BruteForce_Threat_Detection/
 ```
 
 **Key Files:**
-- `scripts/proper_training.py` - Main training pipeline
+- `scripts/proper_training.py` - Main training pipeline (trains LR + IF ensemble)
+- `scripts/simulate_realtime.py` - Real-time detection simulation demo
+- `run_simulation.sh` - Demo runner script (quick/extended demo)
 - `scripts/comprehensive_testing.py` - Complete evaluation framework
 - `scripts/realtime_monitor.py` - Real-time detection system
-- `documentation/REPORT.md` - Comprehensive technical report
-- `documentation/OVERFITTING_ANALYSIS.md` - Detailed methodology analysis
+- `documentation/REPORT.md` - Comprehensive technical report with full methodology
+- `documentation/README.md` - Quick start guide and script explanations
 
 **Performance Benchmarks:**
 - **Processing Speed:** 82,434 samples/second (batch mode)
